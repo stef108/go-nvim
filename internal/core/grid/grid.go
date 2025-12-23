@@ -33,6 +33,13 @@ func New(width, height int) *Grid {
 	}
 }
 
+func (g *Grid) SetCursor(x, y int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.CursorX = x
+	g.CursorY = y
+}
+
 // Resize safely resizes the grid, preserving old content where it overlaps.
 func (g *Grid) Resize(w, h int) {
 	g.mu.Lock()
@@ -145,4 +152,23 @@ func (dest *Grid) Overlay(src *Grid, offsetX, offsetY int) {
 			}
 		}
 	}
+}
+
+func (g *Grid) CopyFrom(src *Grid) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	src.mu.RLock()
+	defer src.mu.RUnlock()
+
+	// ... copy loop ...
+	copy(g.Cells, src.Cells)
+
+	// Copy dimensions
+	g.Width = src.Width
+	g.Height = src.Height
+
+	// Copy Cursor
+	g.CursorX = src.CursorX
+	g.CursorY = src.CursorY
 }

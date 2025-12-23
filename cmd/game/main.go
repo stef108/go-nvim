@@ -7,7 +7,7 @@ import (
 	"neovim-game/internal/adapters/nvim"
 	"neovim-game/internal/adapters/tui"
 	"neovim-game/internal/common"
-	"neovim-game/internal/core/grid"
+	"neovim-game/internal/engine"
 
 	"github.com/gdamore/tcell/v2"
 )
@@ -15,33 +15,33 @@ import (
 func main() {
 	f := common.InitLogger()
 	defer f.Close()
-	log.Println("--- STARTING NEOVIM GAME ---")
+	log.Println("--- STARTING GAME ENGINE ---")
 
-	// Init Render Screen
+	// 1. Init TUI
 	renderer, err := tui.New()
 	if err != nil {
-		log.Fatalf("Fatal: Tcell init failed: %v", err)
+		log.Fatal(err)
 	}
 	defer renderer.Close()
-
 	w, h := renderer.Size()
-	mainGrid := grid.New(w, h)
 
-	// --- TEST PATTERN (Draw Red Diagonal) ---
-	for i := 0; i < 20 && i < w && i < h; i++ {
-		mainGrid.SetContent(i, i, '█', tcell.StyleDefault.Foreground(tcell.ColorRed))
+	// 2. Init Engine (The Brain)
+	game := engine.New(w, h)
+
+	// 3. Init Neovim (The Background)
+	nv, err := nvim.New(w, h, game.CodeGrid)
+	if err != nil {
+		renderer.Close()
+		log.Fatalf("Neovim failed: %v", err)
 	}
-	renderer.Render(mainGrid)
-	log.Println("--- TEST PATTERN DRAWN ---")
-	// ----------------------------------------
+	defer nv.Close()
 
-	// Start Input Loop (NON-BLOCKING)
-	// We start this NOW so we can capture Ctrl+C even if Neovim hangs
-	inputChan := make(chan string)              // Channel to send keys to Neovim
-	resizeChan := make(chan struct{ w, h int }) // Channel for resize events
+	// 4. Input Channels
+	inputChan := make(chan string)
+	resizeChan := make(chan struct{ w, h int })
 
+	// 5. Start Input Loop
 	go func() {
-		log.Println("--- INPUT LOOP STARTED ---")
 		for {
 			ev := renderer.PollEvent()
 			switch ev := ev.(type) {
@@ -49,19 +49,20 @@ func main() {
 				width, height := ev.Size()
 				renderer.Sync()
 				resizeChan <- struct{ w, h int }{width, height}
-
 			case *tcell.EventKey:
-				log.Printf("Key: %v", ev.Name()) // DEBUG LOG
-
 				if ev.Key() == tcell.KeyCtrlBackslash {
-					log.Println("Emergency Exit Triggered")
 					renderer.Close()
-					return // Hard exit
+					return
+				}
+				// Game Logic: Spawn bug on 's' key for testing
+				if ev.Rune() == 's' {
+					// We spawn it at column 10, row 0
+					log.Println("Spawning Bug!")
+					game.SpawnEnemy(10, 0)
 				}
 
 				vimKey := tui.InputToVimString(ev)
 				if vimKey != "" {
-					// Non-blocking send (so TUI doesn't freeze if Neovim is busy)
 					select {
 					case inputChan <- vimKey:
 					default:
@@ -71,45 +72,36 @@ func main() {
 		}
 	}()
 
-	// Init Neovim (Blocking, but with timeout)
-	log.Println("--- CONNECTING TO NEOVIM ---")
-	nv, err := nvim.New(w, h, mainGrid)
-	if err != nil {
-		renderer.Close()
-		log.Fatalf("Neovim failed: %v", err)
-	}
-	defer nv.Close()
-
-	// Wire up Channels
-	// Listen for input from our TUI loop and send to Neovim
+	// 6. Handle Channels
 	go func() {
 		for {
 			select {
 			case key := <-inputChan:
 				nv.Input(key)
 			case size := <-resizeChan:
-				mainGrid.Resize(size.w, size.h)
+				game.Resize(size.w, size.h)
 				nv.Resize(size.w, size.h)
 			}
 		}
 	}()
+	const targetFPS = 120
+	ticker := time.NewTicker(time.Second / time.Duration(targetFPS))
+	defer ticker.Stop()
 
-	// The Render Trigger
-	nv.OnFlush = func() {
-		mainGrid.CursorX = nv.CursorX
-		mainGrid.CursorY = nv.CursorY
-		renderer.Render(mainGrid)
+	lastTime := time.Now()
+
+	for range ticker.C {
+		now := time.Now()
+		dt := now.Sub(lastTime).Seconds()
+		lastTime = now
+
+		// A. Update Physics
+		game.Update(dt)
+
+		// B. Compose Frame (Code + Enemies)
+		finalGrid := game.DrawCompositor()
+
+		// C. Render to Screen
+		renderer.Render(finalGrid)
 	}
-
-	// Force Neovim to Draw Initial Screen
-	// We send a command to force a redraw, clearing the Red Line
-	go func() {
-		time.Sleep(500 * time.Millisecond)
-		nv.Input("<Esc>")
-		nv.Input(":redraw!<CR>") // Force full repaint
-		log.Println("--- SENT REDRAW COMMAND ---")
-	}()
-
-	// Block forever
-	select {}
 }

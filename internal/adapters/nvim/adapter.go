@@ -39,7 +39,7 @@ type Adapter struct {
 }
 
 func New(width, height int, targetGrid *grid.Grid) (*Adapter, error) {
-	cmd := exec.Command("nvim", "--embed", "--clean")
+	cmd := exec.Command("nvim", "--embed")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
@@ -112,7 +112,7 @@ func (a *Adapter) handleRedraw(batches ...[]interface{}) {
 		case "hl_attr_define":
 			a.handleHlAttrDefine(args)
 
-		case "cursor_goto":
+		case "grid_cursor_goto":
 			// Expected: [grid_id, row, col]
 			for _, arg := range args {
 				posSlice, ok := arg.([]interface{})
@@ -122,6 +122,7 @@ func (a *Adapter) handleRedraw(batches ...[]interface{}) {
 					c := len(posSlice) - 1
 					a.CursorY = toInt(posSlice[r])
 					a.CursorX = toInt(posSlice[c])
+					a.Grid.SetCursor(a.CursorX, a.CursorY)
 				}
 			}
 

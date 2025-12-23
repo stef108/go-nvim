@@ -25,7 +25,6 @@ func New() (*Renderer, error) {
 		return nil, err
 	}
 
-	// Enable mouse support if you want users to be able to click (optional)
 	s.EnableMouse()
 
 	// Set default style
@@ -60,7 +59,6 @@ func (r *Renderer) Sync() {
 // This is the Frame Draw call.
 func (r *Renderer) Render(g *grid.Grid) {
 	// We lock the grid to ensure we don't read while Neovim is writing
-
 	r.Screen.ShowCursor(g.CursorX, g.CursorY)
 
 	// Optimize: Only draw within the bounds of the screen or grid, whichever is smaller
@@ -78,13 +76,11 @@ func (r *Renderer) Render(g *grid.Grid) {
 			char, style, width := g.GetContent(x, y)
 
 			// Tcell optimization: smart invalidation is built-in to SetContent,
-			// but we can skip 'width 0' cells (continuations) as SetContent handles them via the previous call.
 			if width == 0 {
 				continue
 			}
 
 			// Draw the cell
-			// combinedArgs is for combining characters (accents), we usually don't need them for code.
 			r.Screen.SetContent(x, y, char, nil, style)
 		}
 	}
