@@ -37,7 +37,6 @@ func (e *Engine) DrawCompositor() *grid.Grid {
 
 	// Draw UI
 	e.drawHUD()
-	e.drawHeatGauge()
 
 	if e.IsGameOver {
 		e.drawGameOver()
@@ -53,24 +52,6 @@ func (e *Engine) DrawCompositor() *grid.Grid {
 // Inline helper for bounds checking
 func (e *Engine) isInBounds(x, y int) bool {
 	return x >= 0 && x < e.RenderGrid.Width && y >= 0 && y < e.RenderGrid.Height
-}
-
-func (e *Engine) drawHUD() {
-	status := fmt.Sprintf(" SCORE: %04d | HP: %d%% ", e.Score, e.Health)
-	hpColor := tcell.ColorGreen
-	if e.Health < 50 {
-		hpColor = tcell.ColorYellow
-	}
-	if e.Health < 20 {
-		hpColor = tcell.ColorRed
-	}
-
-	style := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(hpColor).Bold(true)
-
-	startX := e.RenderGrid.Width - len(status) - 2
-	for i, r := range status {
-		e.RenderGrid.SetContent(startX+i, 0, r, style)
-	}
 }
 
 func (e *Engine) drawGameOver() {
@@ -134,53 +115,155 @@ func (e *Engine) drawRailgun() {
 	}
 }
 
-func (e *Engine) drawHeatGauge() {
-	// Draw a bar at the bottom center
-	barWidth := 40
-	startX := (e.RenderGrid.Width - barWidth) / 2
+func (e *Engine) drawHUD() {
+	// We draw on the very last line of the screen
 	y := e.RenderGrid.Height - 1
+	w := e.RenderGrid.Width
 
-	// Calculate fill amount
+	// 1. Clear the HUD Background (Dark Gray/Black for contrast)
+	bgStyle := tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite)
+	for x := range w {
+		e.RenderGrid.SetContent(x, y, ' ', bgStyle)
+	}
+
+	// 2. Draw Left Module: Health
+	// Layout: [♥ 100% ■■■■■■■■■■]
+	e.drawHealthModule(0, y)
+
+	// 3. Draw Right Module: Score
+	// Layout: [SCORE 001500]
+	e.drawScoreModule(w, y)
+
+	// 4. Draw Center Module: Heat/Overdrive
+	// Layout:  --[ HEAT ⚡⚡⚡ ]--
+	// We calculate remaining space to center it perfectly
+	e.drawHeatModule(w, y)
+}
+
+func (e *Engine) drawHealthModule(startX, y int) {
+	// Health Color Logic
+	hpColor := tcell.ColorGreen
+	if e.Health < 50 {
+		hpColor = tcell.ColorYellow
+	}
+	if e.Health < 20 {
+		hpColor = tcell.ColorRed
+	}
+
+	// The Label " HP "
+	labelStyle := tcell.StyleDefault.Background(hpColor).Foreground(tcell.ColorBlack).Bold(true)
+	label := " HP "
+	cursor := startX
+
+	for _, r := range label {
+		e.RenderGrid.SetContent(cursor, y, r, labelStyle)
+		cursor++
+	}
+
+	// The Bar [■■■□□]
+	// We use 10 blocks for 100% health
+	blocks := 10
+	fill := int((float64(e.Health) / float64(e.MaxHealth)) * float64(blocks))
+
+	// Add a little padding
+	cursor++
+
+	for i := range blocks {
+		char := '▱'
+		style := tcell.StyleDefault.Foreground(tcell.ColorGray).Background(tcell.ColorBlack)
+
+		if i < fill {
+			char = '▰'
+			style = tcell.StyleDefault.Foreground(hpColor).Background(tcell.ColorBlack)
+		}
+		e.RenderGrid.SetContent(cursor, y, char, style)
+		cursor++
+	}
+
+	// Draw numerical percent
+	pct := fmt.Sprintf(" %d%%", e.Health)
+	for _, r := range pct {
+		e.RenderGrid.SetContent(cursor, y, r, tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite))
+		cursor++
+	}
+}
+
+func (e *Engine) drawScoreModule(screenWidth, y int) {
+	// Format: "SCORE 000000"
+	text := fmt.Sprintf("SCORE %06d ", e.Score)
+
+	// Color: Neon Blue for arcade feel
+	style := tcell.StyleDefault.Background(tcell.ColorDarkBlue).Foreground(tcell.ColorWhite).Bold(true)
+
+	// Draw from Right to Left
+	startX := screenWidth - len(text)
+	for i, r := range text {
+		e.RenderGrid.SetContent(startX+i, y, r, style)
+	}
+}
+
+func (e *Engine) drawHeatModule(screenWidth, y int) {
+	// We want this centered between the Health (Left) and Score (Right)
+
+	barWidth := 30
+	startX := (screenWidth - barWidth) / 2
+
 	fillPercent := e.Heat / e.MaxHeat
 	if fillPercent > 1.0 {
 		fillPercent = 1.0
 	}
-	filledChars := int(float64(barWidth) * fillPercent)
 
-	// Draw the Container
-	for i := 0; i < barWidth; i++ {
-		char := ' '
-		style := tcell.StyleDefault.Background(tcell.ColorGray)
+	// If Overheated, the bar pulses or looks different
+	baseChar := '═'
+	fillChar := '═'
+	primaryColor := tcell.ColorOrange
 
-		if i < filledChars {
-			// Simple threshold approach:
-			if e.IsOverheated {
-				style = style.Background(tcell.ColorAqua).Foreground(tcell.ColorWhite)
-				char = '⚡'
-			} else if fillPercent > 0.8 {
-				style = style.Background(tcell.ColorRed)
-				char = '▓'
-			} else if fillPercent > 0.5 {
-				style = style.Background(tcell.ColorOrange)
-				char = '▒'
-			} else {
-				style = style.Background(tcell.ColorGreen)
-				char = '░'
+	if e.IsOverheated {
+		primaryColor = tcell.ColorAqua
+		fillChar = '≡'
+	}
+
+	// Draw the "Track"
+	centerLabel := " HEAT "
+	if e.IsOverheated {
+		centerLabel = " OVERDRIVE "
+	}
+
+	// Draw the Bar container
+	filledLen := int(float64(barWidth) * fillPercent)
+
+	for i := range barWidth {
+		char := baseChar
+		style := tcell.StyleDefault.Foreground(tcell.ColorDarkGray).Background(tcell.ColorBlack)
+
+		// Fill Logic
+		if i < filledLen {
+			char = fillChar
+			// Gradient Logic
+			col := primaryColor
+			if !e.IsOverheated {
+				if fillPercent > 0.8 {
+					col = tcell.ColorRed
+				}
+				if fillPercent < 0.5 {
+					col = tcell.ColorGreen
+				}
 			}
+			style = tcell.StyleDefault.Foreground(col).Background(tcell.ColorBlack)
 		}
 
 		e.RenderGrid.SetContent(startX+i, y, char, style)
 	}
 
-	// Label
-	label := " HEAT "
-	if e.IsOverheated {
-		label = " OVERDRIVE "
-	}
-	labelX := startX + (barWidth-len(label))/2
-	labelStyle := tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorBlack)
+	// Overlay the Label in the absolute center of the bar
+	labelX := startX + (barWidth-len(centerLabel))/2
+	labelStyle := tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorBlack).Bold(true)
 
-	for i, r := range label {
+	if e.IsOverheated {
+		labelStyle = labelStyle.Background(tcell.ColorAqua).Foreground(tcell.ColorBlack)
+	}
+
+	for i, r := range centerLabel {
 		e.RenderGrid.SetContent(labelX+i, y, r, labelStyle)
 	}
 }
