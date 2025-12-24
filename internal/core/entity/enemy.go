@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/mattn/go-runewidth"
 )
 
 type Enemy struct {
@@ -42,6 +43,17 @@ func (e *Enemy) RenderPos() (int, int) {
 	return int(e.X), int(e.Y)
 }
 
+// IsHit checks if the coordinate (x,y) overlaps with the enemy body
 func (e *Enemy) IsHit(x, y int) bool {
-	return int(e.X) == x && int(e.Y) == y
+	ey := int(e.Y + 0.5)
+	if ey != y {
+		return false
+	}
+
+	ex := int(e.X + 0.5)
+
+	// Calculate how wide this enemy actually is
+	width := runewidth.RuneWidth(e.Char)
+
+	return x >= ex && x < ex+width
 }
