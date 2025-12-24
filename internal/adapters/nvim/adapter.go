@@ -74,6 +74,10 @@ func New(width, height int, targetGrid *grid.Grid) (*Adapter, error) {
 			done <- result{nil, fmt.Errorf("AttachUI failed: %v | Stderr: %s", err, stderr.String())}
 			return
 		}
+		v.Command("set virtualedit=all")
+		v.Command("set scrolloff=0")
+		v.Command("set sidescrolloff=0")
+		v.Command("set nowrap")
 		done <- result{adapter, nil}
 	}()
 

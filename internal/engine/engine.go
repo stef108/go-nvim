@@ -1,10 +1,14 @@
 package engine
 
 import (
+	"fmt"
+	"math/rand"
 	"sync"
 
 	"neovim-game/internal/core/entity"
 	"neovim-game/internal/core/grid"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 type Engine struct {
@@ -18,6 +22,16 @@ type Engine struct {
 
 	stopChan chan struct{}
 	mu       sync.RWMutex
+
+	// Game Rules
+	Score      int
+	Health     int
+	MaxHealth  int
+	IsGameOver bool
+
+	// Wave Logic
+	SpawnTimer float64
+	SpawnRate  float64
 }
 
 func New(w, h int) *Engine {
@@ -27,6 +41,13 @@ func New(w, h int) *Engine {
 		CodeGrid:   grid.New(w, h),
 		RenderGrid: grid.New(w, h),
 		stopChan:   make(chan struct{}),
+
+		// Defaults
+		Score:      0,
+		Health:     100,
+		MaxHealth:  100,
+		SpawnRate:  2.0,
+		SpawnTimer: 0,
 	}
 }
 
@@ -53,22 +74,55 @@ func (e *Engine) Update(dt float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if e.IsGameOver {
+		return
+	}
+
+	// WAVE SPAWNER ---
+	e.SpawnTimer -= dt
+	if e.SpawnTimer <= 0 {
+		e.SpawnTimer = e.SpawnRate
+
+		// Random X position (avoid edges)
+		margin := 8
+
+		if e.CodeGrid.Width > (margin * 2) {
+			playableWidth := e.CodeGrid.Width - (margin * 2)
+			spawnX := rand.Intn(playableWidth) + margin
+			e.Enemies = append(e.Enemies, entity.NewBug(spawnX, 0))
+		}
+	}
+
 	cursorX := e.CodeGrid.CursorX
 	cursorY := e.CodeGrid.CursorY
-	// Update all enemies
 	activeEnemies := e.Enemies[:0]
 
 	for _, bug := range e.Enemies {
 		bug.Update(dt)
 
+		// A. HIT DETECTION (Player Kills Bug)
 		if bug.IsHit(cursorX, cursorY) {
 			e.Explode(bug.X, bug.Y)
+			e.Score += 10 // Reward
+
+			// Difficulty Ramp: Every 500 points, spawn 0.1s faster
+			if e.Score%100 == 0 && e.SpawnRate > 0.5 {
+				e.SpawnRate -= 0.1
+			}
 			continue
 		}
-		// Cast Height to float64 for comparison
-		if bug.Y < float64(e.CodeGrid.Height) {
-			activeEnemies = append(activeEnemies, bug)
+
+		// Bug Hits Bottom
+		if bug.Y >= float64(e.CodeGrid.Height) {
+			e.Health -= 10
+			// might be nice to add a red flash or something
+			if e.Health <= 0 {
+				e.IsGameOver = true
+			}
+			continue
 		}
+
+		activeEnemies = append(activeEnemies, bug)
 	}
 	e.Enemies = activeEnemies
 
@@ -111,5 +165,46 @@ func (e *Engine) DrawCompositor() *grid.Grid {
 		}
 	}
 
+	e.drawHUD()
+
+	if e.IsGameOver {
+		e.drawGameOver()
+	}
+
 	return e.RenderGrid
+}
+
+func (e *Engine) drawHUD() {
+	status := fmt.Sprintf(" SCORE: %04d | HP: %d%% ", e.Score, e.Health)
+
+	// Color logic: Green if healthy, Red if dying
+	hpColor := tcell.ColorGreen
+	if e.Health < 50 {
+		hpColor = tcell.ColorYellow
+	}
+	if e.Health < 20 {
+		hpColor = tcell.ColorRed
+	}
+
+	style := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(hpColor).Bold(true)
+
+	// Draw at Top Right
+	startX := e.RenderGrid.Width - len(status) - 2
+	y := 0
+
+	for i, r := range status {
+		e.RenderGrid.SetContent(startX+i, y, r, style)
+	}
+}
+
+func (e *Engine) drawGameOver() {
+	msg := " SYSTEM FAILURE - PRESS CTRL+\\ TO QUIT "
+	style := tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorWhite).Bold(true)
+
+	centerX := (e.RenderGrid.Width - len(msg)) / 2
+	centerY := e.RenderGrid.Height / 2
+
+	for i, r := range msg {
+		e.RenderGrid.SetContent(centerX+i, centerY, r, style)
+	}
 }
