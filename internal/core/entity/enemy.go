@@ -26,7 +26,7 @@ func NewBug(x, y int) *Enemy {
 		Style: tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true),
 
 		// Fall speed
-		VelY: 8,
+		VelY: 2,
 		VelX: 0,
 	}
 }

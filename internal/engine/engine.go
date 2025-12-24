@@ -21,14 +21,21 @@ type Engine struct {
 	VisualY float64
 
 	// System
-	stopChan chan struct{}
-	mu       sync.RWMutex
+	stopChan  chan struct{}
+	mu        sync.RWMutex
+	TimeTotal float64
 
 	// Game Rules
 	Score      int
 	Health     int
 	MaxHealth  int
 	IsGameOver bool
+
+	// Combo System
+	Heat         float64
+	MaxHeat      float64
+	HeatDecay    float64
+	IsOverheated bool
 
 	// Wave Logic
 	SpawnTimer float64
@@ -44,10 +51,14 @@ func New(w, h int) *Engine {
 		stopChan:   make(chan struct{}),
 
 		// Defaults
-		Score:      0,
-		Health:     100,
-		MaxHealth:  100,
-		SpawnRate:  2.0,
-		SpawnTimer: 0,
+		Score:        0,
+		Health:       100,
+		MaxHealth:    100,
+		SpawnRate:    2.0,
+		SpawnTimer:   0,
+		Heat:         0,
+		MaxHeat:      100,
+		HeatDecay:    2.5,
+		IsOverheated: false,
 	}
 }

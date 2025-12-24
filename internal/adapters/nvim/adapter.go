@@ -14,7 +14,7 @@ import (
 )
 
 // Helper to safely cast any number type to int
-func toInt(v interface{}) int {
+func toInt(v any) int {
 	switch i := v.(type) {
 	case int64:
 		return int(i)
@@ -96,7 +96,7 @@ func (a *Adapter) Close()          { a.Ref.Close() }
 func (a *Adapter) Resize(w, h int) { a.Ref.TryResizeUI(w, h) }
 func (a *Adapter) Input(k string)  { a.Ref.Input(k) }
 
-func (a *Adapter) handleRedraw(batches ...[]interface{}) {
+func (a *Adapter) handleRedraw(batches ...[]any) {
 	for _, batch := range batches {
 		if len(batch) == 0 {
 			continue
@@ -119,7 +119,7 @@ func (a *Adapter) handleRedraw(batches ...[]interface{}) {
 		case "grid_cursor_goto":
 			// Expected: [grid_id, row, col]
 			for _, arg := range args {
-				posSlice, ok := arg.([]interface{})
+				posSlice, ok := arg.([]any)
 				if ok && len(posSlice) >= 2 {
 					// Use toInt() to handle uint64/int64
 					r := len(posSlice) - 2
@@ -138,9 +138,10 @@ func (a *Adapter) handleRedraw(batches ...[]interface{}) {
 	}
 }
 
-func (a *Adapter) handleGridLine(args []interface{}) {
+func (a *Adapter) handleGridLine(args []any) {
 	for _, arg := range args {
-		lineParams, ok := arg.([]interface{})
+		lineParams, ok := arg.([]any)
+
 		if !ok {
 			continue
 		}
@@ -149,13 +150,13 @@ func (a *Adapter) handleGridLine(args []interface{}) {
 		// row := int(lineParams[1].(int64)) -> CRASH
 		row := toInt(lineParams[1])
 		colStart := toInt(lineParams[2])
-		cells := lineParams[3].([]interface{})
+		cells := lineParams[3].([]any)
 
 		col := colStart
 		currentStyleID := 0
 
 		for _, cellData := range cells {
-			cellSlice, ok := cellData.([]interface{})
+			cellSlice, ok := cellData.([]any)
 			if !ok {
 				continue
 			}
@@ -172,7 +173,6 @@ func (a *Adapter) handleGridLine(args []interface{}) {
 			}
 
 			style := a.styles[currentStyleID]
-			// Temporary hack: Force white text if default (id 0) to ensure visibility against black bg
 			if currentStyleID == 0 {
 				style = style.Foreground(tcell.ColorWhite)
 			}
@@ -191,11 +191,11 @@ func (a *Adapter) handleGridLine(args []interface{}) {
 	}
 }
 
-func (a *Adapter) handleHlAttrDefine(args []interface{}) {
+func (a *Adapter) handleHlAttrDefine(args []any) {
 	for _, arg := range args {
-		params := arg.([]interface{})
+		params := arg.([]any)
 		id := toInt(params[0])
-		rgbAttrs := params[1].(map[string]interface{})
+		rgbAttrs := params[1].(map[string]any)
 
 		style := tcell.StyleDefault
 

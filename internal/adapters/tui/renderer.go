@@ -56,7 +56,7 @@ func (r *Renderer) Sync() {
 }
 
 // Render commits a Grid to the physical screen.
-// This is the Frame Draw call.
+// This the Frame Draw call.
 func (r *Renderer) Render(g *grid.Grid) {
 	// We lock the grid to ensure we don't read while Neovim is writing
 	r.Screen.ShowCursor(g.CursorX, g.CursorY)
@@ -85,7 +85,6 @@ func (r *Renderer) Render(g *grid.Grid) {
 		}
 	}
 
-	// The actual flush to the terminal
 	r.Screen.Show()
 }
 
@@ -98,7 +97,7 @@ func (r *Renderer) PollEvent() tcell.Event {
 // InputToVimString converts tcell events to Vim notation.
 // e.g. Ctrl+C -> "<C-c>", Escape -> "<Esc>"
 func InputToVimString(ev *tcell.EventKey) string {
-	// 1. Handle Special Keys First
+	// Handle Special Keys First
 	switch ev.Key() {
 	case tcell.KeyEsc:
 		return "<Esc>"
@@ -122,7 +121,7 @@ func InputToVimString(ev *tcell.EventKey) string {
 		return " "
 	}
 
-	// 2. Handle Control Modifiers (Ctrl+A, Ctrl+C, etc)
+	// Handle Control Modifiers (Ctrl+A, Ctrl+C, etc)
 	if ev.Modifiers()&tcell.ModCtrl != 0 {
 		if ev.Key() == tcell.KeyCtrlC {
 			return "<C-c>"
