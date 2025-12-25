@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"math/rand"
 
 	"neovim-game/internal/core/entity"
@@ -17,6 +18,7 @@ func (e *Engine) Update(dt float64) {
 	e.TimeTotal += dt
 	e.updateHeat(dt)
 	e.updateCursor(dt)
+	e.calculateImpactForce()
 	e.updateSpawner(dt)
 	e.updateEntities(dt)
 }
@@ -47,6 +49,22 @@ func (e *Engine) updateCursor(dt float64) {
 	e.VisualY += (targetY - e.VisualY) * 25.0 * dt
 }
 
+func (e *Engine) calculateImpactForce() {
+	currX := float64(e.CodeGrid.CursorX)
+	currY := float64(e.CodeGrid.CursorY)
+
+	// Calculate Distance moved since last frame
+	dx := currX - e.LastCursorX
+	dy := currY - e.LastCursorY
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	// Set Force (Minimum 1 so you can still touch things)
+	e.ImpactForce = max(int(dist), 1)
+
+	e.LastCursorX = currX
+	e.LastCursorY = currY
+}
+
 func (e *Engine) updateSpawner(dt float64) {
 	e.SpawnTimer -= dt
 	if e.SpawnTimer <= 0 {
@@ -55,7 +73,8 @@ func (e *Engine) updateSpawner(dt float64) {
 		safeW := e.CodeGrid.Width - 5 // So enemies dont spawn on linenumbers
 		if safeW > 0 {
 			spawnX := rand.Intn(safeW) + 1
-			e.Enemies = append(e.Enemies, entity.NewBug(spawnX, 0))
+			isArmored := rand.Float64() < 0.20
+			e.Enemies = append(e.Enemies, entity.NewBug(spawnX, 0, isArmored))
 		}
 	}
 }
@@ -75,8 +94,9 @@ func (e *Engine) updateEntities(dt float64) {
 
 		// Collision (Handles both Normal & Railgun)
 		if e.checkHit(bug, cursorHitX, cursorHitY) {
-			e.handleKill(bug)
-			continue
+			if e.resolveCombat(bug) {
+				continue
+			}
 		}
 
 		// Check Leak
@@ -112,9 +132,40 @@ func (e *Engine) checkHit(bug *entity.Enemy, cursorX, cursorY int) bool {
 	return bug.IsHit(cursorX, cursorY)
 }
 
+// Resolvecombat handles the hp / damage logic
+func (e *Engine) resolveCombat(bug *entity.Enemy) bool {
+	damage := e.ImpactForce
+
+	// Railgun ignores armor and deals infinite damage
+	if e.IsOverheated {
+		damage = 9999
+	}
+
+	// Armor Mechanic: Deflects weak hits
+	if bug.IsArmored && damage < 3 {
+		// Could spawn a ping partice or sound here later mayber
+		return false
+	}
+
+	// Apply Damage
+	bug.HP -= damage
+
+	if bug.HP <= 0 {
+		e.handleKill(bug)
+		return true
+	}
+
+	return false
+}
+
 // handleKill manages Score, Heat, and Explosions
 func (e *Engine) handleKill(bug *entity.Enemy) {
 	e.Score += 10
+
+	// Big Damage Bonus
+	if e.ImpactForce > 20 {
+		e.Score += 40 // "CRIT"? Bonus
+	}
 
 	if e.IsOverheated {
 		e.Explode(bug.X, bug.Y)

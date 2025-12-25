@@ -31,6 +31,11 @@ type Engine struct {
 	MaxHealth  int
 	IsGameOver bool
 
+	// impact system
+	LastCursorX float64
+	LastCursorY float64
+	ImpactForce int
+
 	// Combo System
 	Heat         float64
 	MaxHeat      float64

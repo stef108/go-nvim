@@ -15,15 +15,30 @@ type Enemy struct {
 	// Velocity (Cells per second)
 	VelX, VelY float64
 	IsDead     bool
+	HP         int
+	MaxHP      int
+	IsArmored  bool
 }
 
-func NewBug(x, y int) *Enemy {
+func NewBug(x, y int, armored bool) *Enemy {
+	hp := 1
+	char := '👾'
+	style := tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true)
+
+	if armored {
+		hp = 10 // Requires a jump of 10+ chars to one-shot, or many small hits
+		char = '🛡'
+		style = tcell.StyleDefault.Foreground(tcell.ColorBlue).Bold(true)
+	}
 	return &Enemy{
-		ID:    rand.Int(),
-		X:     float64(x),
-		Y:     float64(y),
-		Char:  '👾',
-		Style: tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true),
+		HP:        hp,
+		MaxHP:     hp,
+		IsArmored: armored,
+		ID:        rand.Int(),
+		X:         float64(x),
+		Y:         float64(y),
+		Char:      char,
+		Style:     style,
 
 		// Fall speed
 		VelY: 8,
