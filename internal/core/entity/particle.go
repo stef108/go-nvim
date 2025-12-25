@@ -15,20 +15,34 @@ type Particle struct {
 }
 
 // NewExplosion creates a cluster of particles at a point
-func NewExplosion(x, y float64) []*Particle {
-	count := 8 // Number of debris pieces
+func NewExplosion(x, y float64, intensity int) []*Particle {
+	if intensity < 1 {
+		intensity = 1
+	}
+	if intensity > 50 {
+		intensity = 50
+	}
+
+	// Base of 5 particles, plus more for higher intensity
+	count := 5 + (intensity / 2)
+
+	// Higher intensity = debris flies faster and further
+	speedMult := 1.0 + (float64(intensity) * 0.1)
+
 	particles := make([]*Particle, count)
 
-	for i := 0; i < count; i++ {
-		// Random angle and speed
-		// VelX: -10 to 10
-		// VelY: -5 to 5
-		vx := (rand.Float64() - 0.5) * 20.0
-		vy := (rand.Float64() - 0.5) * 10.0
+	for i := range count {
+		// Random angle
+		vx := (rand.Float64() - 0.5) * 20.0 * speedMult
+		vy := (rand.Float64() - 0.5) * 10.0 * speedMult
 
-		// Random character for debris
 		chars := []rune{'*', '.', ',', 'o', 'x'}
 		c := chars[rand.Intn(len(chars))]
+
+		style := tcell.StyleDefault.Foreground(tcell.ColorOrange)
+		if intensity > 15 {
+			style = tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true)
+		}
 
 		particles[i] = &Particle{
 			X:        x,
@@ -36,8 +50,8 @@ func NewExplosion(x, y float64) []*Particle {
 			VelX:     vx,
 			VelY:     vy,
 			Char:     c,
-			Style:    tcell.StyleDefault.Foreground(tcell.ColorOrange).Bold(false),
-			Lifetime: 0.8,
+			Style:    style,
+			Lifetime: 0.5 + (rand.Float64() * 0.5), // Random lifetime 0.5-1.0s
 		}
 	}
 	return particles

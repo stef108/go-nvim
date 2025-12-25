@@ -41,7 +41,7 @@ func NewBug(x, y int, armored bool) *Enemy {
 		Style:     style,
 
 		// Fall speed
-		VelY: 8,
+		VelY: 1,
 		VelX: 0,
 	}
 }

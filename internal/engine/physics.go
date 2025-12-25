@@ -79,8 +79,8 @@ func (e *Engine) updateSpawner(dt float64) {
 	}
 }
 
-func (e *Engine) Explode(x, y float64) {
-	e.Particles = append(e.Particles, entity.NewExplosion(x, y)...)
+func (e *Engine) Explode(x, y float64, force int) {
+	e.Particles = append(e.Particles, entity.NewExplosion(x, y, force)...)
 }
 
 func (e *Engine) updateEntities(dt float64) {
@@ -168,11 +168,11 @@ func (e *Engine) handleKill(bug *entity.Enemy) {
 	}
 
 	if e.IsOverheated {
-		e.Explode(bug.X, bug.Y)
-		e.Explode(bug.X, bug.Y-1)
+		e.Explode(bug.X, bug.Y, 50)
+		e.Explode(bug.X, bug.Y-1, 50)
 	} else {
 		// Standard explosion, add Heat to build combo
-		e.Explode(bug.X, bug.Y)
+		e.Explode(bug.X, bug.Y, e.ImpactForce)
 		e.Heat += 20.0
 	}
 
