@@ -110,11 +110,21 @@ func (g *Grid) GetContent(x, y int) (rune, tcell.Style, int) {
 
 // Clear wipes the grid efficiently.
 func (g *Grid) Clear() {
-	// Fast memory clear usually works, but for Tcell we need correct defaults
 	empty := Cell{Char: ' ', Style: tcell.StyleDefault, Width: 1}
 	for i := range g.Cells {
 		g.Cells[i] = empty
 	}
+}
+
+// IsSolid returns true if the cell contains a visible character (Ground).
+func (g *Grid) IsSolid(x, y int) bool {
+	if x < 0 || y < 0 || x >= g.Width || y >= g.Height {
+		return false
+	}
+
+	cell := g.Cells[y*g.Width+x]
+
+	return cell.Char != ' ' && cell.Char != 0 && cell.Char != '\t'
 }
 
 // CopyFrom overlays one grid onto another.

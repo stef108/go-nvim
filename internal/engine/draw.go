@@ -20,20 +20,9 @@ func (e *Engine) DrawCompositor() *grid.Grid {
 	if e.IsOverheated {
 		e.drawRailgun()
 	}
-	// Draw Entities
-	for _, bug := range e.Enemies {
-		x, y := bug.RenderPos()
-		if e.isInBounds(x, y) {
-			e.RenderGrid.SetContent(x, y, bug.Char, bug.Style)
-		}
-	}
 
-	for _, p := range e.Particles {
-		x, y := int(p.X), int(p.Y)
-		if e.isInBounds(x, y) {
-			e.RenderGrid.SetContent(x, y, p.Char, p.Style)
-		}
-	}
+	e.drawEntities()
+	e.drawParticles()
 
 	// Draw UI
 	e.drawHUD()
@@ -52,6 +41,21 @@ func (e *Engine) DrawCompositor() *grid.Grid {
 // Inline helper for bounds checking
 func (e *Engine) isInBounds(x, y int) bool {
 	return x >= 0 && x < e.RenderGrid.Width && y >= 0 && y < e.RenderGrid.Height
+}
+
+func (e *Engine) drawEntities() {
+	for _, ent := range e.Entities {
+		ent.Render(e.RenderGrid)
+	}
+}
+
+func (e *Engine) drawParticles() {
+	for _, p := range e.Particles {
+		x, y := int(p.X), int(p.Y)
+		if e.isInBounds(x, y) {
+			e.RenderGrid.SetContent(x, y, p.Char, p.Style)
+		}
+	}
 }
 
 func (e *Engine) drawGameOver() {

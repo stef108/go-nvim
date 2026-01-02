@@ -9,7 +9,7 @@ import (
 
 type Engine struct {
 	// State
-	Enemies   []*entity.Enemy
+	Entities  []entity.GameEntity
 	Particles []*entity.Particle
 
 	// The Buffers
@@ -49,7 +49,7 @@ type Engine struct {
 
 func New(w, h int) *Engine {
 	return &Engine{
-		Enemies:    make([]*entity.Enemy, 0),
+		Entities:   make([]entity.GameEntity, 0),
 		Particles:  make([]*entity.Particle, 0),
 		CodeGrid:   grid.New(w, h),
 		RenderGrid: grid.New(w, h),
