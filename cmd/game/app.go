@@ -21,7 +21,6 @@ type App struct {
 }
 
 func NewApp(fps int) *App {
-	//  Init TUI
 	renderer, err := tui.New()
 	if err != nil {
 		log.Fatal(err)
@@ -29,10 +28,8 @@ func NewApp(fps int) *App {
 
 	w, h := renderer.Size()
 
-	// Init Engine
 	game := engine.New(w, h)
 
-	// Init Neovim
 	nv, err := nvim.New(w, h, game.CodeGrid)
 	if err != nil {
 		renderer.Close()
@@ -51,11 +48,10 @@ func (app *App) Run() {
 	defer app.Renderer.Close()
 	defer app.Adapter.Close()
 
-	// Channels
-	inputChan := make(chan string, 100) // Buffered slightly
+	inputChan := make(chan string, 100)
 	resizeChan := make(chan struct{ w, h int })
+	doneChan := make(chan struct{})
 
-	// --- Input Loop ---
 	go func() {
 		for {
 			ev := app.Renderer.PollEvent()
@@ -65,8 +61,8 @@ func (app *App) Run() {
 				app.Renderer.Sync()
 				resizeChan <- struct{ w, h int }{w, h}
 			case *tcell.EventKey:
-				if ev.Key() == tcell.KeyCtrlBackslash {
-					app.Renderer.Close()
+				if ev.Key() == tcell.KeyCtrlQ {
+					close(doneChan)
 					return
 				}
 				vimKey := tui.InputToVimString(ev)
@@ -84,6 +80,8 @@ func (app *App) Run() {
 	go func() {
 		for {
 			select {
+			case <-doneChan:
+				return
 			case key := <-inputChan:
 				app.Adapter.Input(key)
 			case size := <-resizeChan:
@@ -99,13 +97,18 @@ func (app *App) Run() {
 
 	lastTime := time.Now()
 
-	for range ticker.C {
-		now := time.Now()
-		dt := now.Sub(lastTime).Seconds()
-		lastTime = now
+	for {
+		select {
+		case <-doneChan:
+			return
+		case now := <-ticker.C:
+			dt := now.Sub(lastTime).Seconds()
+			lastTime = now
 
-		app.Engine.Update(dt)
-		frame := app.Engine.DrawCompositor()
-		app.Renderer.Render(frame)
+			app.Engine.Update(dt)
+			frame := app.Engine.DrawCompositor()
+
+			app.Renderer.Render(frame)
+		}
 	}
 }
